@@ -5,29 +5,12 @@
 
 
 from pycocotools.coco import COCO
-
-
-# In[2]:
-
-
-annFile = './annotations/captions_train2017.json'
-coco_caps=COCO(annFile)
-
-
-# In[3]:
-
-
-vals  = coco_caps.anns.values()
-texts = []
-for v in list(vals):
-    texts.append(v['caption'])
-
+import pandas as pd
 
 # In[4]:
-
-
-texts
-
+texts = pd.read_csv('extended_prompts.csv')
+texts = texts['extended'].values[10000:20000]
+print(texts)
 
 # In[5]:
 
@@ -57,33 +40,30 @@ pipe.enable_xformers_memory_efficient_attention()
 import hashlib
 from tqdm import tqdm
 
+batch_size = 8
+
 img_paths = []
 prompts = []
 
-for text in tqdm(texts[:3103]):
-    print(text)
+for i in tqdm(range(len(texts) // batch_size)):
+    text_batch = texts[i:i+batch_size].tolist()
     with torch.autocast("cuda"): 
-        output = pipe(text, num_images_per_prompt=1, height=512, width=512, num_inference_steps=20)
+        output = pipe(text_batch, num_images_per_prompt=1)
         images = output.images
     
-    for i in range(len(images)):
-        text_hash = hashlib.sha256(f"{text}_{i}".encode('utf-8')).hexdigest()
-        output_path = f"coco_gen_512/{text_hash}.png"
-        images[i].save(f"coco_gen_512/{text_hash}.png")
+    for i in range(len(text_batch)):
+        text_hash = hashlib.sha256(f"{text_batch[i]}_{i}".encode('utf-8')).hexdigest()
+        output_path = f"coco_gen_ex_2/{text_hash}.png"
+        images[i].save(f"coco_gen_ex_2/{text_hash}.png")
+        print(text_hash)
         img_paths.append(output_path)
-        prompts.append(text)
-
-
-# In[ ]:
-
-
-import pandas as pd
+        prompts.append(text_batch[i])
 
 
 # In[ ]:
 
 
 d = {'path': prompts, 'prompt': img_paths}
-pd.DataFrame(data=d).to_csv('files.csv', index=False)
+pd.DataFrame(data=d).to_csv('files_ex_2.csv', index=False)
 
 
